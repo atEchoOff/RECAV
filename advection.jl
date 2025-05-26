@@ -15,7 +15,6 @@ include("initialize_globals.jl")
 psi(u) = .5 * u^2
 
 cache = (;
-    Q_skew, 
     M, 
     psi, 
     blend,
@@ -31,7 +30,9 @@ cache = (;
     v,
     Rdr,
     Dv,
-    knapsack_solver! = knapsack_solver
+    knapsack_solver! = knapsack_solver,
+    bc = nothing,
+    Q_skew_nz = zip(findnz(sparse(Q_skew))...)
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)

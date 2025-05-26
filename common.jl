@@ -1,25 +1,54 @@
+import Trixi: flux_hllc
+# use the 2D implementation since the 1D version doesn't account for n::Integer < 0
+function flux_hllc(u_ll, u_rr, n::SVector{1}, equations::CompressibleEulerEquations1D)
+    f = flux_hllc(SVector(u_ll[1], u_ll[2], 0, u_ll[3]), 
+                  SVector(u_rr[1], u_rr[2], 0, u_rr[3]), 
+                  SVector(n[1], 0.0), 
+                  CompressibleEulerEquations2D(equations.gamma))    
+    return SVector(f[1], f[2], f[4])
+end
+
+function store_fourier_coeffs!(target, param)
+    if eltype(param) == Float64
+        target .= real.(fft(param))
+    else
+        target .= SVector{length(eltype(param)), Float64}.([real.(fft(getindex.(param, i))) for i in 1:length(eltype(param))]...)
+    end
+end
+
+function add_inverse_fourier!(target, param)
+    if eltype(param) == Float64
+        target .+= real.(ifft(param))
+    else
+        target .+= SVector{length(eltype(param)), Float64}.([real.(ifft(getindex.(param, i))) for i in 1:length(eltype(param))]...)
+    end
+end
+
 function rhs!(du, u, cache, t)
-    (; Q_skew, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!) = cache
+    (; Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc) = cache
     fill!(r_H, zero(eltype(du)))
     fill!(r_L, zero(eltype(du)))
     fill!(r_entropy_rhs, zero(eltype(x)))
 
+    if !isnothing(bc)
+        u[1] = bc[:, 1]
+        u[end] = bc[:, end]
+    end
+
     @. v = cons2entropy.(u, equations)
 
-    for i in eachindex(u), j in eachindex(u)
+    for (i, j, q) in Q_skew_nz
         if i > j
-            if abs(Q_skew[i, j]) > 1e-12
-                nij = Q_skew[i, j]
+            if abs(q) > 1e-12
+                nij = q
                 FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
                 FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                entropy_ij = norm(nij) * (v[j]'flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
+                entropy_ij = norm(nij) * (v[j]'flux_central(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
 
                 if blend == :local_entropy_local_scalar
-                    # Low order method is entropy stable
-                    # @assert -v[i]'FL_ij + entropy_ij <= 0
 
                     λ = 0.
-                    if v[i]' * (FH_ij - FL_ij) > 100 * eps()
+                    if abs(v[i]' * (FH_ij - FL_ij)) > 100 * eps() && -v[i]'FH_ij + entropy_ij > 100 * eps()
                         λ = clamp((v[i]'FH_ij - entropy_ij) / (v[i]' * (FH_ij - FL_ij)), 0., 1.)
                     end
 
@@ -29,32 +58,30 @@ function rhs!(du, u, cache, t)
                     r_H[i] += FH_ij
                     r_H[j] -= FH_ij
 
-                    r_L[i] += FL_ij
-                    r_L[j] -= FL_ij
-
                     r_entropy_rhs[i] += entropy_ij
                     r_entropy_rhs[j] -= entropy_ij
                 end
+
+                r_L[i] += FL_ij
+                r_L[j] -= FL_ij
             end
         end
     end
 
     if blend == :highorder || blend == :local_entropy_local_scalar
+        if blending_strat == :fft && filter_strength > 0
+            store_fourier_coeffs!(Rdr, r_L .- r_H)
+            lower_bounds = 1 .- exp.(-filter_strength * (1:length(a)))
+            Rdr .*= lower_bounds
+            add_inverse_fourier!(r_H, Rdr)
+        end
+        
         du .= -(M \ r_H)
     elseif blend == :loworder
-        # The low order method should be globally entropy stable
-        @assert v'r_L >= 0
-
         du .= -(M \ r_L)
-
-        # The low order method should also be nodally entropy stable
-        r_entropy_rhs .= M \ r_entropy_rhs
-        for i in eachindex(du)
-            @assert v[i]'du[i] + r_entropy_rhs[i] <= 0
-        end
     elseif blend == :global_entropy_global_scalar
         # Simply take a convex combination (scalar lambda) between r_L and r_H to get an entropy stable method
-        λ = clamp(v'r_L / (v' * (r_L - r_H)), 0, 1)
+        λ = clamp(v'r_L - (psi(u[end]) - psi(u[1])) / (v' * (r_L - r_H)), 0, 1)
 
         du .= -(M \ (λ * r_H + (1 - λ) * r_L))
     elseif blend == :global_entropy_knapsack
@@ -76,14 +103,8 @@ function rhs!(du, u, cache, t)
             Rdr[end] = zero(eltype(Rdr))
         elseif blending_strat == :fft
             # Handling SVectors is odd
-            if eltype(u0) == Float64
-                Dv .= real.(fft(v))
-                Rdr .= real.(fft(r_L .- r_H))
-            else
-                # This is an SVector. fft each component
-                Dv .= SVector{length(eltype(u0)), Float64}.([real.(fft(getindex.(v, i))) for i in 1:length(eltype(u0))]...)
-                Rdr .= SVector{length(eltype(u0)), Float64}.([real.(fft(getindex.(r_L .- r_H, i))) for i in 1:length(eltype(u0))]...)
-            end
+            store_fourier_coeffs!(Dv, v)
+            store_fourier_coeffs!(Rdr, r_L .- r_H)
         else
             throw("Blending strat $blending_strat not supported")
         end
@@ -93,10 +114,7 @@ function rhs!(du, u, cache, t)
 
         # Set a as the elementwise product between R (r^L - r^H) (in Rdr) and Δ'v (in Dv)
         a .= dot.(Rdr, Dv)
-        b = -v'r_H - a'lower_bounds
-
-        # Some naiive shock capturing...
-        # b *= 10
+        b = -v'r_H - (psi(u[end]) - psi(u[1])) - a'lower_bounds
 
         # Now, run the knapsack solver
         knapsack_solver!(θ, a, b, upper_bounds=1 .- lower_bounds)
@@ -108,12 +126,7 @@ function rhs!(du, u, cache, t)
                 r_H[i] += Rdr[i + 1] - Rdr[i]
             end
         elseif blending_strat == :fft
-            if eltype(u0) == Float64
-                r_H .+= real.(ifft(Rdr))
-            else
-                # We are working with SVectors again
-                r_H .+= SVector{length(eltype(u0)), Float64}.([real.(ifft(getindex.(Rdr, i))) for i in 1:length(eltype(u0))]...)
-            end
+            add_inverse_fourier!(r_H, Rdr)
         else
             throw("Blending strat $blending_strat not supported")
         end
@@ -124,10 +137,17 @@ function rhs!(du, u, cache, t)
         throw("Blending strategy $blend is not supported")
     end
 
+    if !isnothing(bc)
+        du[1] = zero(eltype(du))
+        du[end] = zero(eltype(du))
+    end
+
     return du
 end
 
-D = periodic_derivative_operator(; derivative_order=1, accuracy_order=accuracy_order, xmin=xmin, xmax=xmax, N=num_nodes)
+# D = periodic_derivative_operator(; derivative_order=1, accuracy_order=accuracy_order, xmin=xmin, xmax=xmax, N=num_nodes)
+D = derivative_operator(WilliamsDuru2024(:central), derivative_order=1, accuracy_order=accuracy_order,
+                               xmin=xmin, xmax=xmax, N=num_nodes)
 M = mass_matrix(D)
 Q = M * Matrix(D)
 Q_skew = Q - Q'

@@ -1,18 +1,17 @@
-xmin = -1
+xmin = 0
 xmax = 1
-T = 1.
+T = .2
 
 include("common.jl")
 
-equations = InviscidBurgersEquation1D()
-initial_condition = initial_condition_burgers_gaussian
+equations = CompressibleEulerEquations1D(1.4)
+initial_condition = initial_condition_modified_sod
 
 u0 = initial_condition.(x)
-# @. u0 = prim2cons.(u0, equations)
 
 include("initialize_globals.jl")
 
-psi(u) = (1/6 * u .^ 3)[1]
+psi(u) = u[2]
 
 cache = (;
     M, 
@@ -31,7 +30,7 @@ cache = (;
     Rdr,
     Dv,
     knapsack_solver! = knapsack_solver,
-    bc = nothing,
+    bc = [u0[1] u0[end]],
     Q_skew_nz = zip(findnz(sparse(Q_skew))...)
 )
 
@@ -46,5 +45,5 @@ sol = solve(ode,
             adaptive=adaptive)
 
 @gif for i in eachindex(sol.t)
-    plot(x, getindex.(sol.u[i], 1), leg=false)
+    plot(x, getindex.(sol.u[i], 1), leg=false, ylims=(0, 1))
 end

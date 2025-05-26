@@ -1,18 +1,19 @@
-xmin = -1
-xmax = 1
-T = 1.
+using MAT
+
+xmin = -5
+xmax = 5
+T = 1.8
 
 include("common.jl")
 
-equations = InviscidBurgersEquation1D()
-initial_condition = initial_condition_burgers_gaussian
+equations = CompressibleEulerEquations1D(1.4)
+initial_condition = initial_condition_shu_osher
 
 u0 = initial_condition.(x)
-# @. u0 = prim2cons.(u0, equations)
 
 include("initialize_globals.jl")
 
-psi(u) = (1/6 * u .^ 3)[1]
+psi(u) = u[2]
 
 cache = (;
     M, 
@@ -31,8 +32,8 @@ cache = (;
     Rdr,
     Dv,
     knapsack_solver! = knapsack_solver,
-    bc = nothing,
-    Q_skew_nz = zip(findnz(sparse(Q_skew))...)
+    bc = [u0[1] u0[end]],
+    Q_skew_nz = zip(findnz(sparse(Q_skew))...),
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)
@@ -45,6 +46,7 @@ sol = solve(ode,
             callback=AliveCallback(alive_interval=1000), 
             adaptive=adaptive)
 
-@gif for i in eachindex(sol.t)
-    plot(x, getindex.(sol.u[i], 1), leg=false)
-end
+weno_sol = matread("weno5_shuosher.mat")
+# plot(rd.Vp * md.x, u_plot, leg=false)
+plot(weno_sol["x"][1:5:end], weno_sol["rho"][1:5:end], label="WENO", w=2)
+plot!(x, getindex.(sol.u[end], 1), label="DG", w=2)
