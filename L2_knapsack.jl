@@ -24,8 +24,7 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     end
 
     if a' * (upper_bounds .* (a .> 0)) < b
-        println("INFEAS")
-        # Problem is infeasible. Return worst-case
+        # FIXME this shouldn't ever happen, but it does
         x .= upper_bounds .* (a .> 0)
         return x
     end

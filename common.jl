@@ -25,7 +25,7 @@ function add_inverse_fourier!(target, param)
 end
 
 function rhs!(du, u, cache, t)
-    (; weird_Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc) = cache
+    (; weird_Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc, cube_space) = cache
     fill!(r_H, zero(eltype(du)))
     fill!(r_L, zero(eltype(du)))
     fill!(r_entropy_rhs, zero(eltype(x)))
@@ -86,15 +86,25 @@ function rhs!(du, u, cache, t)
         if blend == :semi_local_entropy_knapsack
             # Solve a knapsack problem
             knapsack_solver!(θ_local, a, b)
+            # Save in corresponding index in cube_space
+            for (index, (i, _)) in enumerate(row)
+                cube_space[i, j] = θ_local[index]
+            end
+        end
+    end
 
+    if blend == :semi_local_entropy_knapsack
+        for (j, row) in enumerate(weird_Q_skew_nz)
             for (index, (i, q)) in enumerate(row)
-                # FH_ij = FH_ij_storage[index]
-                # FL_ij = FL_ij_storage[index]
-                nij = q
-                FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                r_H[i] += θ_local[index] * FL_ij + (1 - θ_local[index]) * FH_ij
-                r_H[j] -= θ_local[index] * FL_ij + (1 - θ_local[index]) * FH_ij
+                if i > j
+                    # Relax blending coefficients to satisfy semi local entropy inequality for each node
+                    θ = max(cube_space[i, j], cube_space[j, i])
+                    nij = q
+                    FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                    FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                    r_H[i] += θ * FL_ij + (1 - θ) * FH_ij
+                    r_H[j] -= θ * FL_ij + (1 - θ) * FH_ij
+                end
             end
         end
     end
@@ -203,9 +213,7 @@ for j in 1:size(Q_skew, 2)
 end
 
 for (i, j, q) in Q_skew_nz
-    if i > j
-        push!(weird_Q_skew_nz[j], (i, q))
-    end
+    push!(weird_Q_skew_nz[j], (i, q))
 end
 
 # Which allows looping like this!

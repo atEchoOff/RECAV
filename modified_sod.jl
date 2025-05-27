@@ -32,7 +32,8 @@ cache = (;
     knapsack_solver! = knapsack_solver,
     bc = [u0[1] u0[end]],
     Q_skew_nz = Q_skew_nz,
-    weird_Q_skew_nz
+    weird_Q_skew_nz,
+    cube_space
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)

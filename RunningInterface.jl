@@ -9,7 +9,7 @@ include("initial_conditions.jl")
 include("L2_knapsack.jl")
 
 accuracy_order = 6
-num_nodes = 1024
+num_nodes = 400
 
 timestepper = RK4()
 abstol = 1e-6
@@ -21,7 +21,7 @@ saveat = 1e-2
 blend = :semi_local_entropy_knapsack
 blending_strat = :fft
 
-filter_strength = 0.
+filter_strength = 1e-5
 # 5e-5 for advection, 3, 1000 with buzz
 # 5e-4 for burgers, 3, 1000
 # 5e-6 for shu osh, 6, 1024
