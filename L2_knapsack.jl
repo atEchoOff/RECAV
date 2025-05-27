@@ -11,12 +11,22 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     # maxit is a huge upper bound here. The iteration will take at most N + 1 iterations, but usually takes around 1 - 3, and rarely 4.
     # Note also, if maxit is reached, it likely implies that b is negative, so the problem needs cleaning
 
+    # Use local knapsack memory
+    a_over_w = @view s.a_over_w[1:length(a)]
+
     # Here we minimize theta subject to a'theta >= b
 
     if b <= 0.0
         # x = 0 is the optimal solution for the minimization
         # meaning the optimal solution for the maximization problem is upper_bounds
         fill!(x, zero(eltype(x)))
+        return x
+    end
+
+    if a' * (upper_bounds .* (a .> 0)) < b
+        println("INFEAS")
+        # Problem is infeasible. Return worst-case
+        x .= upper_bounds .* (a .> 0)
         return x
     end
 
@@ -28,11 +38,11 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     lambdak = zero(eltype(a))
     itercount = 0 # for sanity check
 
-    s.a_over_w .= a ./ w
+    a_over_w .= a ./ w
     
     for _ in range(0, maxit)
         # Clip current solution within feasible domain
-        x .= lambdak * s.a_over_w
+        x .= lambdak * a_over_w
         x .= clamp.(x, 0., upper_bounds) # FIXME slow
 
         f_val = a' * x - b
@@ -41,7 +51,7 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
             break
         end
 
-        deriv = a' * (s.a_over_w .* (x .< upper_bounds) .* (lambdak * s.a_over_w .>= 0.0) .* (s.a_over_w .> 0.0))
+        deriv = a' * (a_over_w .* (x .< upper_bounds) .* (lambdak * a_over_w .>= 0.0) .* (a_over_w .> 0.0))
 
         # Compute the next root
         lambdak -= f_val / deriv
@@ -55,7 +65,10 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
         @show a
         @show b
         @show upper_bounds
+        @show x
         println(a'x - b)
+
+        sleep(1)
     end
 
     return x

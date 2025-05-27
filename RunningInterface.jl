@@ -18,10 +18,10 @@ dt = 1e-4
 adaptive = true
 saveat = 1e-2
 
-blend = :local_entropy_local_scalar
+blend = :semi_local_entropy_knapsack
 blending_strat = :fft
 
-filter_strength = 1e-5
+filter_strength = 0.
 # 5e-5 for advection, 3, 1000 with buzz
 # 5e-4 for burgers, 3, 1000
 # 5e-6 for shu osh, 6, 1024

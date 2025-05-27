@@ -31,7 +31,8 @@ cache = (;
     Dv,
     knapsack_solver! = knapsack_solver,
     bc = [u0[1] u0[end]],
-    Q_skew_nz = zip(findnz(sparse(Q_skew))...)
+    Q_skew_nz = Q_skew_nz,
+    weird_Q_skew_nz
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)

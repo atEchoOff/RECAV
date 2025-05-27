@@ -25,7 +25,7 @@ function add_inverse_fourier!(target, param)
 end
 
 function rhs!(du, u, cache, t)
-    (; Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc) = cache
+    (; weird_Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc) = cache
     fill!(r_H, zero(eltype(du)))
     fill!(r_L, zero(eltype(du)))
     fill!(r_entropy_rhs, zero(eltype(x)))
@@ -37,13 +37,22 @@ function rhs!(du, u, cache, t)
 
     @. v = cons2entropy.(u, equations)
 
-    for (i, j, q) in Q_skew_nz
-        if i > j
+    for (j, row) in enumerate(weird_Q_skew_nz)
+        if blend == :semi_local_entropy_knapsack
+            a = @view r_entropy_rhs[1:length(row) + 1] # we dont need r_entropy_rhs for this strategy, so store a here
+            a[end] = zero(eltype(a))
+            θ_local = @view θ[1:length(row) + 1] # same for θ
+            # FH_ij_storage = @view Rdr[1:length(row)] # same for Rdr
+            # FL_ij_storage = @view Rdr[length(row) + 1:2length(row)] # and same for Dv
+            b = 0.
+        end
+        for (index, (i, q)) in enumerate(row)
             if abs(q) > 1e-12
                 nij = q
                 FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
                 FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
                 entropy_ij = norm(nij) * (v[j]'flux_central(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
+                entropy_lom_ij = norm(nij) * (v[j]'flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
 
                 if blend == :local_entropy_local_scalar
 
@@ -54,6 +63,13 @@ function rhs!(du, u, cache, t)
 
                     r_H[i] += λ * FL_ij + (1 - λ) * FH_ij
                     r_H[j] -= λ * FL_ij + (1 - λ) * FH_ij
+                elseif blend == :semi_local_entropy_knapsack
+                    # FH_ij_storage[index] = FH_ij
+                    # FL_ij_storage[index] = FL_ij
+
+                    a[index] = v[i]' * (FL_ij - FH_ij)
+                    a[end] += entropy_ij - entropy_lom_ij
+                    b += -v[i]'FH_ij + entropy_ij
                 else
                     r_H[i] += FH_ij
                     r_H[j] -= FH_ij
@@ -66,12 +82,27 @@ function rhs!(du, u, cache, t)
                 r_L[j] -= FL_ij
             end
         end
+
+        if blend == :semi_local_entropy_knapsack
+            # Solve a knapsack problem
+            knapsack_solver!(θ_local, a, b)
+
+            for (index, (i, q)) in enumerate(row)
+                # FH_ij = FH_ij_storage[index]
+                # FL_ij = FL_ij_storage[index]
+                nij = q
+                FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                r_H[i] += θ_local[index] * FL_ij + (1 - θ_local[index]) * FH_ij
+                r_H[j] -= θ_local[index] * FL_ij + (1 - θ_local[index]) * FH_ij
+            end
+        end
     end
 
-    if blend == :highorder || blend == :local_entropy_local_scalar
+    if blend == :highorder || blend == :local_entropy_local_scalar || blend == :semi_local_entropy_knapsack
         if blending_strat == :fft && filter_strength > 0
             store_fourier_coeffs!(Rdr, r_L .- r_H)
-            lower_bounds = 1 .- exp.(-filter_strength * (1:length(a)))
+            lower_bounds = 1 .- exp.(-filter_strength * (1:length(Rdr)))
             Rdr .*= lower_bounds
             add_inverse_fourier!(r_H, Rdr)
         end
@@ -162,3 +193,31 @@ if blending_strat == :nodal
 end
 
 knapsack_solver = knapsack(blending_length)
+
+# Construct an index pattern for Q_skew...
+Q_skew_nz = zip(findnz(sparse(Q_skew))...)
+weird_Q_skew_nz = Vector{Vector{Tuple{Int64, Float64}}}(undef, size(Q_skew, 2))
+
+for j in 1:size(Q_skew, 2)
+    weird_Q_skew_nz[j] = Vector{Tuple{Int64, Float64}}[]
+end
+
+for (i, j, q) in Q_skew_nz
+    if i > j
+        push!(weird_Q_skew_nz[j], (i, q))
+    end
+end
+
+# Which allows looping like this!
+# Q_skew_copy = deepcopy(Q_skew)
+# for j in axes(Q_skew, 2)
+#     for (i, q) in weird_Q_skew_nz[j]
+#         @assert Q_skew[i, j] == q
+#         @assert Q_skew[j, i] == -q
+
+#         Q_skew_copy[i, j] = 0.
+#         Q_skew_copy[j, i] = 0.
+#     end
+# end
+
+# @assert iszero(Q_skew_copy)
