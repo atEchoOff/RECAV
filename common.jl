@@ -187,8 +187,8 @@ function rhs!(du, u, cache, t)
 end
 
 # D = periodic_derivative_operator(; derivative_order=1, accuracy_order=accuracy_order, xmin=xmin, xmax=xmax, N=num_nodes)
-D = derivative_operator(WilliamsDuru2024(:central), derivative_order=1, accuracy_order=accuracy_order,
-                               xmin=xmin, xmax=xmax, N=num_nodes)
+D = derivative_operator(Mattsson2017(:central), derivative_order=1, accuracy_order=accuracy_order,
+                               xmin=xmin, xmax=xmax, N=num_nodes) # works well: WilliamsDuru2024(:central)
 M = mass_matrix(D)
 Q = M * Matrix(D)
 Q_skew = Q - Q'

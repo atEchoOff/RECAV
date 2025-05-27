@@ -1,6 +1,6 @@
 xmin = -1
 xmax = 1
-T = 1.
+T = 10.
 
 include("common.jl")
 
@@ -48,5 +48,5 @@ sol = solve(ode,
             adaptive=adaptive)
 
 @gif for i in eachindex(sol.t)
-    plot(x, getindex.(sol.u[i], 1), leg=false)
+    plot(x, getindex.(sol.u[i], 1), leg=false, ylims=(0., 1.))
 end

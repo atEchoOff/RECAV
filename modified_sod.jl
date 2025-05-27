@@ -49,3 +49,5 @@ sol = solve(ode,
 @gif for i in eachindex(sol.t)
     plot(x, getindex.(sol.u[i], 1), leg=false, ylims=(0, 1))
 end
+
+plot(x, getindex.(sol.u[end], 1), lw=2)
