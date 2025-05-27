@@ -1,5 +1,6 @@
 xmin = 0
 xmax = 1
+is_periodic = false
 T = .2
 
 include("common.jl")
@@ -17,6 +18,8 @@ cache = (;
     M, 
     psi, 
     blend,
+    entropy_inequality, 
+    entropy_blend,
     blending_strat,
     filter_strength,
     volume_flux, 

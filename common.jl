@@ -25,7 +25,7 @@ function add_inverse_fourier!(target, param)
 end
 
 function rhs!(du, u, cache, t)
-    (; weird_Q_skew_nz, M, psi, blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc, cube_space) = cache
+    (; weird_Q_skew_nz, M, psi, blend, entropy_inequality, entropy_blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc, cube_space) = cache
     fill!(r_H, zero(eltype(du)))
     fill!(r_L, zero(eltype(du)))
     fill!(r_entropy_rhs, zero(eltype(x)))
@@ -38,13 +38,21 @@ function rhs!(du, u, cache, t)
     @. v = cons2entropy.(u, equations)
 
     for (j, row) in enumerate(weird_Q_skew_nz)
-        if blend == :semi_local_entropy_knapsack
-            a = @view r_entropy_rhs[1:length(row) + 1] # we dont need r_entropy_rhs for this strategy, so store a here
-            a[end] = zero(eltype(a))
-            θ_local = @view θ[1:length(row) + 1] # same for θ
-            # FH_ij_storage = @view Rdr[1:length(row)] # same for Rdr
-            # FL_ij_storage = @view Rdr[length(row) + 1:2length(row)] # and same for Dv
-            b = 0.
+        if entropy_inequality == :semi_local
+            if entropy_blend == :grouped
+                a = @view r_entropy_rhs[1:length(row)] # we dont need r_entropy_rhs for this strategy, so store a here
+                θ_local = @view θ[1:length(row)] # same for θ
+                # FH_ij_storage = @view Rdr[1:length(row)] # same for Rdr
+                # FL_ij_storage = @view Rdr[length(row) + 1:2length(row)] # and same for Dv
+                b = 0.
+            elseif entropy_blend == :free
+                a = @view r_entropy_rhs[1:length(row) + 1] # we dont need r_entropy_rhs for this strategy, so store a here
+                a[end] = zero(eltype(a))
+                θ_local = @view θ[1:length(row) + 1] # same for θ
+                # FH_ij_storage = @view Rdr[1:length(row)] # same for Rdr
+                # FL_ij_storage = @view Rdr[length(row) + 1:2length(row)] # and same for Dv
+                b = 0.
+            end
         end
         for (index, (i, q)) in enumerate(row)
             if abs(q) > 1e-12
@@ -54,8 +62,7 @@ function rhs!(du, u, cache, t)
                 entropy_ij = norm(nij) * (v[j]'flux_central(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
                 entropy_lom_ij = norm(nij) * (v[j]'flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
 
-                if blend == :local_entropy_local_scalar
-
+                if entropy_inequality == :local
                     λ = 0.
                     if abs(v[i]' * (FH_ij - FL_ij)) > 100 * eps() && -v[i]'FH_ij + entropy_ij > 100 * eps()
                         λ = clamp((v[i]'FH_ij - entropy_ij) / (v[i]' * (FH_ij - FL_ij)), 0., 1.)
@@ -63,12 +70,17 @@ function rhs!(du, u, cache, t)
 
                     r_H[i] += λ * FL_ij + (1 - λ) * FH_ij
                     r_H[j] -= λ * FL_ij + (1 - λ) * FH_ij
-                elseif blend == :semi_local_entropy_knapsack
+                elseif entropy_inequality == :semi_local
                     # FH_ij_storage[index] = FH_ij
                     # FL_ij_storage[index] = FL_ij
 
-                    a[index] = v[i]' * (FL_ij - FH_ij)
-                    a[end] += entropy_ij - entropy_lom_ij
+                    if entropy_blend == :grouped
+                        a[index] = v[i]' * (FL_ij - FH_ij) - (entropy_lom_ij - entropy_ij)
+                    elseif entropy_blend == :free
+                        a[index] = v[i]' * (FL_ij - FH_ij)
+                        a[end] += entropy_ij - entropy_lom_ij
+                    end
+
                     b += -v[i]'FH_ij + entropy_ij
                 else
                     r_H[i] += FH_ij
@@ -83,9 +95,31 @@ function rhs!(du, u, cache, t)
             end
         end
 
-        if blend == :semi_local_entropy_knapsack
-            # Solve a knapsack problem
-            knapsack_solver!(θ_local, a, b)
+        if entropy_inequality == :semi_local
+            if blend == :knapsack
+                # Solve a knapsack problem
+                knapsack_solver!(θ_local, a, b)
+            elseif blend == :scalar
+                # Sort of like elementwise limiting!
+                if entropy_blend == :free
+                    # Keep the entropy component seperate, do a knapsack problem of size 2
+                    tiny_a = @view a[end - 1:end]
+                    tiny_θ = @view θ_local[end - 1:end]
+                    tiny_a[1] = sum(@view a[1:end - 1])
+                    knapsack_solver!(tiny_θ, tiny_a, b)
+
+                    # Now we only need the blending part of tiny_θ
+                    θ_local .= tiny_θ[1]
+                else
+                    sum_a = sum(a)
+                    if abs(sum_a) < 100 * eps()
+                        θ_local .= 0.
+                    else
+                        θ_local .= clamp(b / sum_a, 0., 1.)
+                    end
+                end
+            end
+
             # Save in corresponding index in cube_space
             for (index, (i, _)) in enumerate(row)
                 cube_space[i, j] = θ_local[index]
@@ -93,7 +127,7 @@ function rhs!(du, u, cache, t)
         end
     end
 
-    if blend == :semi_local_entropy_knapsack
+    if entropy_inequality == :semi_local
         for (j, row) in enumerate(weird_Q_skew_nz)
             for (index, (i, q)) in enumerate(row)
                 if i > j
@@ -109,7 +143,7 @@ function rhs!(du, u, cache, t)
         end
     end
 
-    if blend == :highorder || blend == :local_entropy_local_scalar || blend == :semi_local_entropy_knapsack
+    if entropy_inequality == :none || entropy_inequality == :semi_local || entropy_inequality == :local
         if blending_strat == :fft && filter_strength > 0
             store_fourier_coeffs!(Rdr, r_L .- r_H)
             lower_bounds = 1 .- exp.(-filter_strength * (1:length(Rdr)))
@@ -118,14 +152,12 @@ function rhs!(du, u, cache, t)
         end
         
         du .= -(M \ r_H)
-    elseif blend == :loworder
-        du .= -(M \ r_L)
-    elseif blend == :global_entropy_global_scalar
+    elseif entropy_inequality == :global && blend == :scalar
         # Simply take a convex combination (scalar lambda) between r_L and r_H to get an entropy stable method
         λ = clamp(v'r_L - (psi(u[end]) - psi(u[1])) / (v' * (r_L - r_H)), 0, 1)
 
         du .= -(M \ (λ * r_H + (1 - λ) * r_L))
-    elseif blend == :global_entropy_knapsack
+    elseif entropy_inequality == :global && blend == :knapsack
         # Set blending coefficients as knapsack solution which satisfies a global entropy inequality
         # First, efficiently compute Δ'v (store in Dv)
         if blending_strat == :nodal
@@ -175,7 +207,7 @@ function rhs!(du, u, cache, t)
         # Now, r_H stores r
         du .= -(M \ r_H)
     else
-        throw("Blending strategy $blend is not supported")
+        throw("Not supported: blend: $blend, entropy_inequality: $entropy_inequality")
     end
 
     if !isnothing(bc)
@@ -186,9 +218,13 @@ function rhs!(du, u, cache, t)
     return du
 end
 
-# D = periodic_derivative_operator(; derivative_order=1, accuracy_order=accuracy_order, xmin=xmin, xmax=xmax, N=num_nodes)
-D = derivative_operator(Mattsson2017(:central), derivative_order=1, accuracy_order=accuracy_order,
+if is_periodic
+    D = periodic_derivative_operator(; derivative_order=1, accuracy_order=accuracy_order, xmin=xmin, xmax=xmax, N=num_nodes)
+else
+    D = derivative_operator(Mattsson2017(:central), derivative_order=1, accuracy_order=accuracy_order,
                                xmin=xmin, xmax=xmax, N=num_nodes) # works well: WilliamsDuru2024(:central)
+end
+
 M = mass_matrix(D)
 Q = M * Matrix(D)
 Q_skew = Q - Q'

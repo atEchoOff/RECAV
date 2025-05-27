@@ -2,6 +2,7 @@ using MAT
 
 xmin = -5
 xmax = 5
+is_periodic = false
 T = 1.8
 
 include("common.jl")
@@ -19,6 +20,8 @@ cache = (;
     M, 
     psi, 
     blend,
+    entropy_inequality, 
+    entropy_blend,
     blending_strat,
     filter_strength,
     volume_flux, 
