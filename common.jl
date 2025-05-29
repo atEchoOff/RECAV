@@ -25,7 +25,7 @@ function add_inverse_fourier!(target, param)
 end
 
 function rhs!(du, u, cache, t)
-    (; weird_Q_skew_nz, M, psi, blend, entropy_inequality, entropy_blend, blending_strat, filter_strength, volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc, cube_space) = cache
+    (; weird_Q_skew_nz, M, psi, alpha, dt, blend, entropy_inequality, entropy_blend, blending_strat, filter_strength, volume_flux, low_order_volume_flux, equations, r_H, r_L, r_entropy_rhs, a, θ, v, knapsack_solver!, bc, cube_space) = cache
     fill!(r_H, zero(eltype(du)))
     fill!(r_L, zero(eltype(du)))
     fill!(r_entropy_rhs, zero(eltype(x)))
@@ -58,9 +58,9 @@ function rhs!(du, u, cache, t)
             if abs(q) > 1e-12
                 nij = q
                 FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                entropy_ij = norm(nij) * (v[j]'flux_central(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
-                entropy_lom_ij = norm(nij) * (v[j]'flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
+                FL_ij = norm(nij) * low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                entropy_ij = norm(nij) * (v[j]'volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
+                entropy_lom_ij = norm(nij) * (v[j]'low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations) - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
 
                 if entropy_inequality == :local
                     λ = 0.
@@ -133,9 +133,25 @@ function rhs!(du, u, cache, t)
                 if i > j
                     # Relax blending coefficients to satisfy semi local entropy inequality for each node
                     θ = max(cube_space[i, j], cube_space[j, i])
+
+                    if alpha >= 0
+                        # Let's also satisfy a positivity constraint
+                        bound_1 = 0.
+                        if r_H[i][1] - r_L[i][1] > 100 * eps()
+                            bound_1 = 1 - (1 - alpha) / dt * (M[i, i] * u[i][1] - dt * r_L[i][1]) / (r_H[i][1] - r_L[i][1])
+                        end
+
+                        bound_3 = 0.
+                        if r_H[i][3] - r_L[i][3] > 100 * eps()
+                            bound_3 = 1 - (1 - alpha) / dt * (M[i, i] * u[i][3] - dt * r_L[i][3]) / (r_H[i][3] - r_L[i][3])
+                        end
+                        
+                        θ = max(θ, min(1, bound_1), min(1, bound_3))
+                    end
+
                     nij = q
                     FH_ij = norm(nij) * volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                    FL_ij = norm(nij) * flux_lax_friedrichs(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                    FL_ij = norm(nij) * low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
                     r_H[i] += θ * FL_ij + (1 - θ) * FH_ij
                     r_H[j] -= θ * FL_ij + (1 - θ) * FH_ij
                 end
