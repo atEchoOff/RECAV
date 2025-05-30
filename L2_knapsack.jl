@@ -1,9 +1,10 @@
 struct QuadraticKnapsackMinimizer{Ttol}
     tol::Ttol
     a_over_w::Vector{Float64}
+    direction::Int64
 
     function QuadraticKnapsackMinimizer{Ttol}(size::Int64; tol::Ttol = 100 * eps()) where {Ttol}
-        return new{Ttol}(tol, zeros(Ttol, size))
+        return new{Ttol}(tol, zeros(Ttol, size), 1)
     end
 end
 

@@ -7,15 +7,16 @@ using SparseArrays
 using FFTW
 include("initial_conditions.jl")
 include("L2_knapsack.jl")
+include("L2_knapsack_maximizer.jl")
 
-accuracy_order = 7
+accuracy_order = 6
 num_nodes = 4000
 
 timestepper = RK4()
 abstol = 1e-6
 reltol = 1e-4
 dt = 1e-4
-adaptive = false
+adaptive = true
 saveat = 1e-2
 
 entropy_inequality = :semi_local # which inequality will we enforce
@@ -33,4 +34,7 @@ low_order_volume_flux = flux_lax_friedrichs
 
 preserve_positivity = -1
 
+knapsack_shock_capturing = -1
+
+# knapsack = QuadraticKnapsackMinimizer{Float64}
 knapsack = QuadraticKnapsackMinimizer{Float64}

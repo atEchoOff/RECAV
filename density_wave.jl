@@ -6,7 +6,7 @@ T = 1
 include("common.jl")
 
 equations = CompressibleEulerEquations1D(1.4)
-initial_condition = initial_condition_density_wave_flattened_gaussian_fast
+initial_condition = initial_condition_density_wave_fast
 
 u0 = initial_condition.(x, 0.)
 
@@ -39,7 +39,10 @@ cache = (;
     bc = nothing,
     Q_skew_nz = Q_skew_nz,
     weird_Q_skew_nz,
-    cube_space = cube_space
+    cube_space = cube_space,
+    FH_ij_storage,
+    FL_ij_storage,
+    knapsack_shock_capturing
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)

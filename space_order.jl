@@ -2,7 +2,7 @@ using Polynomials
 
 MODULE = "density_wave.jl"
 
-accuracy_order = 4
+accuracy_order = 5
 adaptive = false
 dt = 1e-4
 

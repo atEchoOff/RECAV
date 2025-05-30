@@ -39,7 +39,10 @@ cache = (;
     bc = [u0[1] u0[end]],
     Q_skew_nz = Q_skew_nz,
     weird_Q_skew_nz,
-    cube_space
+    cube_space,
+    FH_ij_storage,
+    FL_ij_storage,
+    knapsack_shock_capturing
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)
@@ -54,4 +57,4 @@ sol = solve(ode,
 
 u = cons2prim.(sol.u[end], equations)
 
-plot(x, getindex.(u, 2), lw=2)
+plot(x, getindex.(u, 1), yaxis=:log, lw=2)
