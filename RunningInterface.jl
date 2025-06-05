@@ -9,8 +9,8 @@ include("initial_conditions.jl")
 include("L2_knapsack.jl")
 include("L2_knapsack_maximizer.jl")
 
-accuracy_order = 6
-num_nodes = 4000
+accuracy_order = 4
+num_nodes = 400
 
 timestepper = RK4()
 abstol = 1e-6
@@ -21,7 +21,7 @@ saveat = 1e-2
 
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :knapsack # how to blend together schemes to satisfy the inequality
-entropy_blend = :free # how to treat the low/high order entropy fluxes
+entropy_blend = :grouped # how to treat the low/high order entropy fluxes
 blending_strat = :fft # for global knapsack, blending strat. Otherwise, postprocessing step.
 
 filter_strength = 0.
@@ -30,7 +30,7 @@ filter_strength = 0.
 # 5e-6 for shu osh, 6, 1024
 
 volume_flux = flux_central
-low_order_volume_flux = flux_lax_friedrichs
+low_order_volume_flux = flux_hllc
 
 preserve_positivity = -1
 

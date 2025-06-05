@@ -40,7 +40,7 @@ function rhs!(du, u, cache, t)
 
     for (j, row) in enumerate(weird_Q_skew_nz)
         if entropy_inequality == :semi_local
-            if entropy_blend == :grouped
+            if entropy_blend == :grouped || entropy_blend == :viscosity
                 a = @view r_entropy_rhs[1:length(row)] # we dont need r_entropy_rhs for this strategy, so store a here
                 θ_local = @view θ[1:length(row)] # same for θ
                 b = 0.
@@ -55,7 +55,13 @@ function rhs!(du, u, cache, t)
             if abs(q) > 1e-12
                 nij = q
                 FH_ij_storage[i, j] = volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                FL_ij_storage[i, j] = low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                
+                if entropy_blend == :viscosity
+                    FL_ij_storage[i, j] = u[i] - u[j]
+                else
+                    FL_ij_storage[i, j] = low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
+                end
+
                 FH_ij = norm(nij) * FH_ij_storage[i, j]
                 FL_ij = norm(nij) * FL_ij_storage[i, j]
                 entropy_ij = norm(nij) * (v[j]'FH_ij_storage[i, j] - (psi(u[j]) - psi(u[i])) * nij / norm(nij))
@@ -75,6 +81,8 @@ function rhs!(du, u, cache, t)
                     elseif entropy_blend == :free
                         a[index] = v[i]' * (FL_ij - FH_ij)
                         a[end] += entropy_ij - entropy_lom_ij
+                    elseif entropy_blend == :viscosity
+                        a[index] = (v[i] - v[j])'FL_ij
                     end
 
                     if knapsack_solver!.direction == 1
@@ -125,8 +133,11 @@ function rhs!(du, u, cache, t)
                     θ_local .= tiny_θ[1]
                 else
                     sum_a = sum(a)
-                    if abs(sum_a) < 100 * eps()
+                    if abs(sum_a) < 100 * eps() || b < 100 * eps() # already satisfies entropy inequality
                         θ_local .= 0.
+                    elseif entropy_blend == :viscosity
+                        # Unbounded
+                        θ_local .= b * a / (a'a)
                     else
                         θ_local .= clamp(b / sum_a, 0., 1.)
                     end
@@ -174,15 +185,30 @@ function rhs!(du, u, cache, t)
             FH_ij_storage = temp_pointer
         end
         
-        for (j, row) in enumerate(weird_Q_skew_nz)
-            for (index, (i, q)) in enumerate(row)
-                if i > j
-                    θ = cube_space[i, j]
-                    nij = q
-                    FH_ij = norm(nij) * FH_ij_storage[i, j]
-                    FL_ij = norm(nij) * FL_ij_storage[i, j]
-                    du[i] += θ * FL_ij + (1 - θ) * FH_ij
-                    du[j] -= θ * FL_ij + (1 - θ) * FH_ij
+        if entropy_blend == :viscosity
+            for (j, row) in enumerate(weird_Q_skew_nz)
+                for (index, (i, q)) in enumerate(row)
+                    if i > j
+                        θ = cube_space[i, j]
+                        nij = q
+                        FH_ij = norm(nij) * FH_ij_storage[i, j]
+                        FL_ij = norm(nij) * FL_ij_storage[i, j]
+                        du[i] += FH_ij + θ * FL_ij
+                        du[j] -= FH_ij + θ * FL_ij
+                    end
+                end
+            end
+        else
+            for (j, row) in enumerate(weird_Q_skew_nz)
+                for (index, (i, q)) in enumerate(row)
+                    if i > j
+                        θ = cube_space[i, j]
+                        nij = q
+                        FH_ij = norm(nij) * FH_ij_storage[i, j]
+                        FL_ij = norm(nij) * FL_ij_storage[i, j]
+                        du[i] += θ * FL_ij + (1 - θ) * FH_ij
+                        du[j] -= θ * FL_ij + (1 - θ) * FH_ij
+                    end
                 end
             end
         end
