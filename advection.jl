@@ -1,12 +1,12 @@
 xmin = -1
 xmax = 1
 is_periodic = true
-T = 1.
+T = 2.
 
 include("common.jl")
 
 equations = LinearScalarAdvectionEquation1D(1.)
-initial_condition = initial_condition_advection_buzz
+initial_condition = initial_condition_advection_sin
 
 u0 = initial_condition.(x, 0.)
 # @. u0 = prim2cons.(u0, equations)
@@ -36,7 +36,8 @@ cache = (;
     v,
     Rdr,
     Dv,
-    knapsack_solver! = knapsack_solver,
+    # knapsack_solver! = knapsack_solver,
+    knapsack_solvers = knapsack_solvers,
     bc = nothing,
     Q_skew_nz = Q_skew_nz,
     weird_Q_skew_nz,
