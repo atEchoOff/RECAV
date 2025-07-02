@@ -20,10 +20,7 @@ adaptive = true
 saveat = 1e-2
 
 entropy_inequality = :semi_local # which inequality will we enforce
-blend = :knapsack # how to blend together schemes to satisfy the inequality
-
-entropy_blend = :irrelevant # how to treat the low/high order entropy fluxes
-blending_strat = :irrelevant # for global knapsack, blending strat. Otherwise, postprocessing step.
+blend = :viscosity # how to blend together schemes to satisfy the inequality
 
 filter_strength = 0.
 # 5e-5 for advection, 3, 1000 with buzz

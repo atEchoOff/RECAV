@@ -8,6 +8,12 @@ struct QuadraticKnapsackMinimizer{Ttol}
     end
 end
 
+# Override indexing floats, makes code for QKL simpler
+import Base.getindex
+function Base.getindex(x::Float64, i::Int64)
+    return x
+end
+
 function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 100 * eps(), maxit=200)
     # maxit is a huge upper bound here. The iteration will take at most N + 1 iterations, but usually takes around 1 - 3, and rarely 4.
     # Note also, if maxit is reached, it likely implies that b is negative, so the problem needs cleaning
@@ -51,7 +57,7 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     
     for _ in range(0, maxit)
         # Clip current solution within feasible domain
-        x .= lambdak * a_over_w
+        x .= lambdak .* a_over_w
         x .= clamp.(x, 0., upper_bounds) # FIXME slow
 
         f_val = dot(a, x) - b

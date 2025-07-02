@@ -137,7 +137,10 @@ function rhs!(du, u, cache, t)
         end
     end
 
-    du .= -(M \ r_H)
+    # du .= -(M \ r_H)
+    for i in eachindex(du)
+        du[i] = -r_H[i] / M[i, i]
+    end
 
     # Finish off boundary conditions
     if !isnothing(bc)
@@ -182,17 +185,3 @@ end
 Q_skew = sparse(Q_skew)
 Q_skew_rows = rowvals(Q_skew)
 Q_skew_vals = nonzeros(Q_skew)
-
-# Which allows looping like this!
-# Q_skew_copy = deepcopy(Q_skew)
-# for (j, row) in enumerate(weird_Q_skew_nz)
-#     for (index, (i, q)) in enumerate(row)
-#         @assert Q_skew[i, j] == q
-#         @assert Q_skew[j, i] == -q
-
-#         Q_skew_copy[i, j] = 0.
-#         # Q_skew_copy[j, i] = 0.
-#     end
-# end
-
-# @assert iszero(Q_skew_copy)
