@@ -9,7 +9,7 @@ include("initial_conditions.jl")
 include("L2_knapsack.jl")
 include("L2_knapsack_maximizer.jl")
 
-accuracy_order = 5
+accuracy_order = 4
 num_nodes = 1024
 
 timestepper = RK4()
@@ -21,8 +21,9 @@ saveat = 1e-2
 
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :knapsack # how to blend together schemes to satisfy the inequality
-# entropy_blend = :viscosity # how to treat the low/high order entropy fluxes
-# blending_strat = :fft # for global knapsack, blending strat. Otherwise, postprocessing step.
+
+entropy_blend = :irrelevant # how to treat the low/high order entropy fluxes
+blending_strat = :irrelevant # for global knapsack, blending strat. Otherwise, postprocessing step.
 
 filter_strength = 0.
 # 5e-5 for advection, 3, 1000 with buzz
@@ -30,11 +31,10 @@ filter_strength = 0.
 # 5e-6 for shu osh, 6, 1024
 
 volume_flux = flux_central
-low_order_volume_flux = flux_lax_friedrichs
+low_order_volume_flux = flux_hllc
 
 preserve_positivity = -1
 
 knapsack_shock_capturing = -1
 
-# knapsack = QuadraticKnapsackMinimizer{Float64}
 knapsack = QuadraticKnapsackMinimizer{Float64}

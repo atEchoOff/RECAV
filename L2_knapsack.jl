@@ -24,8 +24,19 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
         return x
     end
 
-    if a' * (upper_bounds .* (a .> 0)) < b
-        # FIXME this shouldn't ever happen, but it does
+    worst_possible = zero(eltype(a))
+
+    for i in eachindex(a)
+        if a[i] > 0
+            a_over_w[i] = a[i] / w[i]
+            worst_possible += a[i] * upper_bounds[i]
+        else
+            a_over_w[i] = zero(eltype(a))
+        end
+    end
+
+    if worst_possible < b
+        # FIXME this shouldn't ever happen, but it sometimes does
         x .= upper_bounds .* (a .> 0)
         return x
     end
@@ -37,21 +48,25 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     # Start the Newton iteration
     lambdak = zero(eltype(a))
     itercount = 0 # for sanity check
-
-    a_over_w .= a ./ w
     
     for _ in range(0, maxit)
         # Clip current solution within feasible domain
         x .= lambdak * a_over_w
         x .= clamp.(x, 0., upper_bounds) # FIXME slow
 
-        f_val = a' * x - b
+        f_val = dot(a, x) - b
 
         if abs(f_val) / max(1, norm(a)) < tol
             break
         end
 
-        deriv = a' * (a_over_w .* (x .< upper_bounds) .* (lambdak * a_over_w .>= 0.0) .* (a_over_w .> 0.0))
+        # Faster derivative computation
+        deriv = zero(eltype(a))
+        for i in eachindex(a)
+            if x[i] < upper_bounds[i]
+                deriv += a[i] * a_over_w[i]
+            end
+        end
 
         # Compute the next root
         lambdak -= f_val / deriv
