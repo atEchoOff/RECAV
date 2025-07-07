@@ -19,6 +19,8 @@ dt = 1e-4
 adaptive = true
 saveat = 1e-2
 
+weak_bcs = true
+
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :viscosity # how to blend together schemes to satisfy the inequality
 
@@ -28,7 +30,7 @@ filter_strength = 0.
 # 5e-6 for shu osh, 6, 1024
 
 volume_flux = flux_central
-low_order_volume_flux = flux_hllc
+low_order_volume_flux = flux_lax_friedrichs
 
 preserve_positivity = -1
 

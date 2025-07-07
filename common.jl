@@ -9,10 +9,16 @@ function flux_hllc(u_ll, u_rr, n::SVector{1}, equations::CompressibleEulerEquati
 end
 
 function rhs!(du, u, cache, t)
-    (; Q_skew, Q_skew_rows, Q_skew_vals, M, psi, alpha, dt, blend, entropy_inequality, volume_flux, low_order_volume_flux, equations, r_H, a, θ, v, knapsack_solvers, bc, FH_ij_storage, FL_ij_storage) = cache
+    (; Q_skew, Q_skew_rows, Q_skew_vals, M, psi, alpha, dt, blend, entropy_inequality, volume_flux, low_order_volume_flux, equations, r_H, a, θ, v, knapsack_solvers, bc, weak_bcs, FH_ij_storage, FL_ij_storage) = cache
 
     @. v = cons2entropy.(u, equations)
     fill!(r_H, zero(eltype(r_H)))
+    fill!(du, zero(eltype(du)))
+
+    if !isnothing(bc) && weak_bcs
+        du[1] += 1 / M[1, 1] * low_order_volume_flux(bc[1], u[1], SVector{1, Float64}(1.), equations)
+        du[end] += 1 / M[end, end] * low_order_volume_flux(bc[end], u[end], SVector{1, Float64}(-1.), equations)
+    end
 
     # This can be threaded since everything inside the loop should be completely indepedent
     for j in axes(Q_skew, 2)
@@ -131,13 +137,12 @@ function rhs!(du, u, cache, t)
         end
     end
 
-    # du .= -(M \ r_H)
     for i in eachindex(du)
-        du[i] = -r_H[i] / M[i, i]
+        du[i] += -r_H[i] / M[i, i]
     end
 
     # Finish off boundary conditions
-    if !isnothing(bc)
+    if !isnothing(bc) && !weak_bcs
         du[1] = zero(eltype(du))
         du[end] = zero(eltype(du))
     end

@@ -30,6 +30,7 @@ cache = (;
     v,
     knapsack_solvers,
     bc = [u0[1], u0[end]],
+    weak_bcs,
     Q_skew,
     Q_skew_rows,
     Q_skew_vals,
