@@ -1,0 +1,18 @@
+r_L = zeros(eltype(u0), size(u0))
+r_H = zeros(eltype(u0), size(u0))
+r_H_temp = zeros(eltype(u0), size(u0))
+a = zeros(eltype(x), max_length + 1, axes(Q_skew, 1))
+θ = zeros(eltype(x), max_length, axes(Q_skew, 1))
+l_c = zeros(eltype(x), max_length, axes(Q_skew, 1))
+b_global = zeros(eltype(x), size(u0))
+v = zeros(eltype(u0), size(u0))
+FH_ij_storage = zeros(eltype(u0), max_length, axes(Q_skew, 1))
+FL_ij_storage = zeros(eltype(u0), max_length, axes(Q_skew, 1))
+flux_storage = zeros(eltype(u0), axes(Q_skew, 1))
+
+function niceplot!()
+    plot!(legendfontsize=12)
+    plot!(xtickfontsize=12)
+    plot!(ytickfontsize=12)
+    plot!(labelfontsize=14)
+end

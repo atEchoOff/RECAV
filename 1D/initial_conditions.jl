@@ -12,10 +12,10 @@ end
 
 function initial_condition_density_wave_flattened_gaussian_fast(x, t)
     x = x - 1.7t
-    if x == -1 || x == 1
-        rho = .5
+    if x > -1 && x < 1
+        rho = 10 * exp(-1 / (x - 1)^2) * exp(-1 / (x + 1)^2) + 1.
     else
-        rho = .5 + exp(-1 / (cos(pi / 2 * x)^2))
+        rho = 1.
     end
 
     u = 1.7
@@ -35,6 +35,25 @@ function initial_condition_modified_sod(x)
         p = .1
     end
     return prim2cons(SVector(rho, v1, p), equations)
+end
+
+function initial_condition_woodward_collela(x)
+    # state.q[density ,:] = 1.
+    # state.q[momentum,:] = 0.
+    # state.q[energy  ,:] = ( (x<0.1)*1.e3 + (0.1<=x)*(x<0.9)*1.e-2 + (0.9<=x)*1.e2 ) / (gamma - 1.)
+    rho = 1.
+    momentum = 0.
+    if x < .1
+        energy = 1.e3
+    elseif x >= .1 && x < .9
+        energy = 1.e-2
+    else
+        energy = 1.e2
+    end
+
+    energy /= 1.4 - 1 # inv_gamma_minus_one
+
+    return SVector{3, Float64}(rho, momentum, energy)
 end
 
 function initial_condition_shu_osher(x)

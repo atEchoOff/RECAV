@@ -1,0 +1,12 @@
+r_L = zeros(eltype(u0), size(u0))
+r_H = zeros(eltype(u0), size(u0))
+a = zeros(eltype(x), max_length + 1, axes(Q_skew, 1))
+θ = zeros(eltype(x), max_length, axes(Q_skew, 1))
+# r_entropy_rhs = zeros(eltype(x), size(x))
+v = zeros(eltype(u0), size(u0))
+# cube_space = zeros(eltype(x), size(Q_skew))
+FH_ij_storage = zeros(eltype(u0), max_length, axes(Q_skew, 1))
+FL_ij_storage = zeros(eltype(u0), max_length, axes(Q_skew, 1))
+
+flux_storage_1 = zeros(eltype(u0), axes(Q_skew, 1))
+flux_storage_2 = zeros(eltype(u0), axes(Q_skew, 1))

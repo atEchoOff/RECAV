@@ -1,23 +1,24 @@
-xmin = -10
-xmax = 10
+xmin = 0.
+xmax = 1.
 is_periodic = false
-T = 1e-4
+reflective_bcs = true
+T = 0.038
 
 include("common.jl")
 
 equations = CompressibleEulerEquations1D(1.4)
-initial_condition = initial_condition_leblanc_shocktube
+initial_condition = initial_condition_woodward_collela
 
 u0 = initial_condition.(x)
 
 include("initialize_globals.jl")
 
-psi(u) = u[2]
+psi(u, nij) = u[2] * nij
 
 cache = (;
     M, 
     psi, 
-    alpha = preserve_positivity,
+    preserve_positivity,
     dt,
     blend,
     entropy_inequality, 
@@ -25,17 +26,25 @@ cache = (;
     low_order_volume_flux,
     equations, 
     r_H, 
+    r_H_temp,
+    r_L,
     a, 
     θ, 
     v,
     knapsack_solvers,
-    bc = [u0[1], u0[end]],
+    bc = nothing,
     weak_bcs,
+    reflective_bcs,
     Q_skew,
     Q_skew_rows,
     Q_skew_vals,
     FH_ij_storage,
-    FL_ij_storage
+    FL_ij_storage,
+    index_of_ji, 
+    flux_storage, 
+    flux,
+    l_c,
+    b_global
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)
@@ -50,4 +59,4 @@ sol = solve(ode,
 
 u = cons2prim.(sol.u[end], equations)
 
-plot(x, getindex.(u, 1), yaxis=:log, lw=2)
+plot(x, getindex.(u, 1), lw=2)

@@ -10,7 +10,7 @@ for type in subtypes(SourceOfCoefficients)
             try
                 operator = derivative_operator(type(:central), derivative_order=1, accuracy_order=i,
                                 xmin=xmin, xmax=xmax, N=num_nodes)
-                print(i, " ")
+                print(i, "(central) ")
             catch
             end
         end

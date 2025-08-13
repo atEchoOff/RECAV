@@ -1,7 +1,8 @@
 xmin = -1
 xmax = 1
-is_periodic = true
-T = 10.
+is_periodic = false
+reflective_bcs = false
+T = 1.
 
 include("common.jl")
 
@@ -13,12 +14,12 @@ u0 = initial_condition.(x)
 
 include("initialize_globals.jl")
 
-psi(u) = (1/6 * u .^ 3)[1]
+psi(u, nij) = (1/6 * u .^ 3)[1] * nij
 
 cache = (;
     M, 
     psi, 
-    alpha = preserve_positivity,
+    preserve_positivity,
     dt,
     blend,
     entropy_inequality, 
@@ -26,17 +27,26 @@ cache = (;
     low_order_volume_flux,
     equations, 
     r_H, 
+    r_H_temp,
+    r_L,
     a, 
     θ, 
     v,
     knapsack_solvers,
     bc = nothing,
+    is_periodic,
     weak_bcs,
+    reflective_bcs,
     Q_skew,
     Q_skew_rows,
     Q_skew_vals,
     FH_ij_storage,
-    FL_ij_storage
+    FL_ij_storage,
+    index_of_ji, 
+    flux_storage, 
+    flux,
+    l_c,
+    b_global
 )
 
 ode = ODEProblem(rhs!, u0, (0., T), cache)

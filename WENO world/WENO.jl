@@ -29,7 +29,7 @@ bcs = [u(0, x) ~ exp(-10 * x^2), # Made the pulse a bit sharper to see WENO's ef
 # 6. Define the spatial and temporal domains
 # Spatial domain from 0.0 to 1.0
 # Temporal domain from 0.0 to 2.0
-domains = [t ∈ Interval(0.0, 2.0),
+domains = [t ∈ Interval(0.0, 1.0),
            x ∈ Interval(-1.0, 1.0)]
 
 # 7. Create the PDE system

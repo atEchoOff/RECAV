@@ -81,7 +81,7 @@ function (s::QuadraticKnapsackMinimizer)(x, a, b; upper_bounds=1., w=1., tol = 1
     end
 
     ### These are all my sanity checks. Non well-posed problems may break them, so if issues are found, uncomment these and the sanity check comments above for checking.
-    if itercount > 6
+    if itercount > 100
         println("The itercount was $itercount")
         @show a
         @show b

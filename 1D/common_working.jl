@@ -104,6 +104,8 @@ function rhs!(du, u, cache, t)
                     θ_local[1] = zero(eltype(θ_local))
                 else
                     θ_local[1] = b_local / a_local[1] # no clamping necessary, a_local > 100 * eps() for SURE for sure
+                    a[2] += b_local
+                    a[3] += 1
                 end
             end
         end
