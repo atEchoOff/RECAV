@@ -23,6 +23,7 @@ cache = (;
     preserve_positivity,
     dt,
     blend,
+    potential_blend,
     entropy_inequality, 
     volume_flux, 
     low_order_volume_flux,

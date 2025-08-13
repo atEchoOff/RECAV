@@ -17,7 +17,7 @@ abstol = 1e-6
 reltol = 1e-4
 dt = 1e-4
 adaptive = true
-saveat = 1e-2
+saveat = 1.
 
 weak_bcs = false
 

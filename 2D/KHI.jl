@@ -62,4 +62,11 @@ sol = solve(ode,
 
 heatmap(reshape(getindex.(sol.u[end], 1), num_nodes, num_nodes)',
     c=:inferno,
-    aspect_ratio=:equal)
+    aspect_ratio=:equal,
+    clim=(.25,2.5))
+plot!(yticks=([0, 250, 500], [0, .5, 1]))
+plot!(xticks=([0, 250, 500], [0, .5, 1]))
+plot!(lims=(0,500))
+plot!(cbar=false)
+plot!(dpi=500)
+plot!(size=(350, 350))

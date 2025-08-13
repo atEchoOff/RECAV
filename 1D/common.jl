@@ -9,7 +9,7 @@ function flux_hllc(u_ll, u_rr, n::SVector{1}, equations::CompressibleEulerEquati
 end
 
 function rhs!(du, u, cache, t)
-    (; Q_skew, Q_skew_rows, Q_skew_vals, M, psi, preserve_positivity, dt, blend, entropy_inequality, low_order_volume_flux, equations, r_H, r_H_temp, r_L, a, θ, v, knapsack_solvers, bc, is_periodic, weak_bcs, reflective_bcs, FH_ij_storage, FL_ij_storage, index_of_ji, flux_storage, flux, l_c, b_global) = cache
+    (; Q_skew, Q_skew_rows, Q_skew_vals, M, psi, preserve_positivity, dt, potential_blend, blend, entropy_inequality, low_order_volume_flux, equations, r_H, r_H_temp, r_L, a, θ, v, knapsack_solvers, bc, is_periodic, weak_bcs, reflective_bcs, FH_ij_storage, FL_ij_storage, index_of_ji, flux_storage, flux, l_c, b_global) = cache
 
     @. v = cons2entropy.(u, equations)
     fill!(r_H, zero(eltype(r_H)))
@@ -53,8 +53,15 @@ function rhs!(du, u, cache, t)
 
         b_local = 0. # FIXME explicit type
 
-        a_local = @view a[1:length(col), j]
-        θ_local = @view θ[1:length(col), j]
+        @static if potential_blend == :free
+            a_local = @view a[1:length(col) + 1, j]
+            θ_local = @view θ[1:length(col) + 1, j]
+            a_local[end] = zero(eltype(a_local))
+        else
+            a_local = @view a[1:length(col), j]
+            θ_local = @view θ[1:length(col), j]
+        end
+
         knapsack_solver_local! = knapsack_solvers[j]
 
         # Part 2
@@ -70,10 +77,20 @@ function rhs!(du, u, cache, t)
 
                 @static if blend == :knapsack
                     FL_ij_local[index] = FL_ij = norm(nij) * low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                    a_local[index] = dot(v[i] - v[j], FL_ij - FH_ij)
+                    @static if potential_blend == :free
+                        a_local[index] = dot(v[i], FL_ij - FH_ij)
+                        a_local[end] -= dot(v[j], FL_ij - FH_ij)
+                    else
+                        a_local[index] = dot(v[i] - v[j], FL_ij - FH_ij)
+                    end
                 elseif blend == :viscosity
                     FL_ij_local[index] = FL_ij = norm(nij) * (u[i] - u[j])
-                    a_local[index] = dot(v[i] - v[j], FL_ij)
+                    @static if potential_blend == :free
+                        a_local[index] = dot(v[i], FL_ij)
+                        a_local[end] -= dot(v[j], FL_ij)
+                    else
+                        a_local[index] = dot(v[i] - v[j], FL_ij)
+                    end
                 end
 
                 b_local += dot(v[j] - v[i], FH_ij) - Ψij
@@ -140,9 +157,18 @@ function rhs!(du, u, cache, t)
         for j in axes(Q_skew, 2)
             col = nzrange(Q_skew, j)
 
-            θ_local = @view θ[1:length(col), j]
-            l_c_local = @view l_c[1:length(col), j]
-            a_local = @view a[1:length(col), j]
+            @static if potential_blend == :free
+                θ_local = @view θ[1:length(col) + 1, j]
+                l_c_local = @view l_c[1:length(col) + 1, j]
+                a_local = @view a[1:length(col) + 1, j]
+
+                l_c_local[end] = 0.
+            else
+                θ_local = @view θ[1:length(col), j]
+                l_c_local = @view l_c[1:length(col), j]
+                a_local = @view a[1:length(col), j]
+            end
+
             b_local = b_global[j]
             knapsack_solver_local! = knapsack_solvers[j]
 
@@ -242,7 +268,7 @@ for (j, col) in enumerate(weird_Q_skew_nz)
     if length(col) > max_length
         max_length = length(col)
     end
-    push!(knapsack_solvers, knapsack(length(col)))
+    push!(knapsack_solvers, knapsack(length(col) + 1))
 end
 
 # Finally,
