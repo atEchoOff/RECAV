@@ -120,13 +120,25 @@ function rhs!(du, u, cache, t)
                 # We should save b_local into b_global
                 b_global[j] = b_local
             elseif blend == :viscosity
-                norm_squared = dot(a_local, a_local)
-                if b_local < 100 * eps() || norm_squared < 100 * eps()
-                    # HOM already satisfies semi_local entropy
-                    θ_local .= zero(eltype(θ_local))
+                @static if potential_blend == :free
+                    a_c_local = max.(0., a_local)
+                    norm_squared = dot(a_local, a_c_local)
+                    if b_local < 100 * eps() || norm_squared < 100 * eps()
+                        # HOM already satisfies semi_local entropy
+                        θ_local .= zero(eltype(θ_local))
+                    else
+                        θ_local .= a_c_local
+                        θ_local .*= b_local / norm_squared
+                    end
                 else
-                    θ_local .= a_local
-                    θ_local .*= b_local / norm_squared
+                    norm_squared = dot(a_local, a_local)
+                    if b_local < 100 * eps() || norm_squared < 100 * eps()
+                        # HOM already satisfies semi_local entropy
+                        θ_local .= zero(eltype(θ_local))
+                    else
+                        θ_local .= a_local
+                        θ_local .*= b_local / norm_squared
+                    end
                 end
             end
         end

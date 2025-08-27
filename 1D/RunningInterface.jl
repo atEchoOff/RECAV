@@ -10,20 +10,20 @@ include("../L2_knapsack.jl")
 include("../L2_knapsack_maximizer.jl")
 
 accuracy_order = 4
-num_nodes = 4000
+num_nodes = 1500
 
-timestepper = RK4()
+timestepper = SSPRK43()
 abstol = 1e-6
 reltol = 1e-4
 dt = 1e-4
-adaptive = false
+adaptive = true
 saveat = 1e-2
 
 weak_bcs = true
 
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :viscosity # how to blend together schemes to satisfy the inequality
-potential_blend = :free
+potential_blend = :nonfree
 
 filter_strength = 0.
 # 5e-5 for advection, 3, 1000 with buzz

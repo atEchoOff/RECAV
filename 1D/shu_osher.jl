@@ -64,6 +64,6 @@ sol = solve(ode,
 weno_sol = matread("1D/weno5_shuosher.mat")
 # plot(rd.Vp * md.x, u_plot, leg=false)
 plot(weno_sol["x"][1:5:end], weno_sol["rho"][1:5:end], label="WENO", w=2)
-plot!(x, getindex.(sol.u[end], 1), label="KL-FD", w=2)
+plot!(x, getindex.(sol.u[end], 1), label="ECAV-FD", w=2)
 plot!(xlim=(-3, 2.5))
 plot!(ylim=(2.5, 5))

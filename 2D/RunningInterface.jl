@@ -10,7 +10,7 @@ include("../L2_knapsack.jl")
 include("../L2_knapsack_maximizer.jl")
 
 accuracy_order = 4
-num_nodes = 512
+num_nodes = 256
 
 timestepper = SSPRK43()
 abstol = 1e-6
