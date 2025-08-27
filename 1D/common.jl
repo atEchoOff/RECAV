@@ -53,7 +53,7 @@ function rhs!(du, u, cache, t)
 
         b_local = 0. # FIXME explicit type
 
-        @static if potential_blend == :free
+        @static if potential_blend == :relaxed
             a_local = @view a[1:length(col) + 1, j]
             θ_local = @view θ[1:length(col) + 1, j]
             a_local[end] = zero(eltype(a_local))
@@ -77,7 +77,7 @@ function rhs!(du, u, cache, t)
 
                 @static if blend == :knapsack
                     FL_ij_local[index] = FL_ij = norm(nij) * low_order_volume_flux(u[i], u[j], SVector{1}(nij / norm(nij)), equations)
-                    @static if potential_blend == :free
+                    @static if potential_blend == :relaxed
                         a_local[index] = dot(v[i], FL_ij - FH_ij)
                         a_local[end] -= dot(v[j], FL_ij - FH_ij)
                     else
@@ -85,7 +85,7 @@ function rhs!(du, u, cache, t)
                     end
                 elseif blend == :viscosity
                     FL_ij_local[index] = FL_ij = norm(nij) * (u[i] - u[j])
-                    @static if potential_blend == :free
+                    @static if potential_blend == :relaxed
                         a_local[index] = dot(v[i], FL_ij)
                         a_local[end] -= dot(v[j], FL_ij)
                     else
@@ -120,7 +120,7 @@ function rhs!(du, u, cache, t)
                 # We should save b_local into b_global
                 b_global[j] = b_local
             elseif blend == :viscosity
-                @static if potential_blend == :free
+                @static if potential_blend == :relaxed
                     a_c_local = max.(0., a_local)
                     norm_squared = dot(a_local, a_c_local)
                     if b_local < 100 * eps() || norm_squared < 100 * eps()
@@ -169,7 +169,7 @@ function rhs!(du, u, cache, t)
         for j in axes(Q_skew, 2)
             col = nzrange(Q_skew, j)
 
-            @static if potential_blend == :free
+            @static if potential_blend == :relaxed
                 θ_local = @view θ[1:length(col) + 1, j]
                 l_c_local = @view l_c[1:length(col) + 1, j]
                 a_local = @view a[1:length(col) + 1, j]

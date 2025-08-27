@@ -23,7 +23,7 @@ weak_bcs = true
 
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :viscosity # how to blend together schemes to satisfy the inequality
-potential_blend = :nonfree
+potential_blend = :relaxed
 
 filter_strength = 0.
 # 5e-5 for advection, 3, 1000 with buzz
