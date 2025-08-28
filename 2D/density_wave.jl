@@ -24,7 +24,6 @@ cache = (;
     dt,
     blend,
     entropy_inequality, 
-    volume_flux, 
     low_order_volume_flux,
     equations, 
     r_H, 
