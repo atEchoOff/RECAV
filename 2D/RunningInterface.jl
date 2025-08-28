@@ -19,8 +19,6 @@ dt = 1e-4
 adaptive = true
 saveat = 1.
 
-weak_bcs = false
-
 entropy_inequality = :semi_local # which inequality will we enforce
 blend = :viscosity # how to blend together schemes to satisfy the inequality
 
@@ -33,7 +31,5 @@ volume_flux = flux_central
 low_order_volume_flux = flux_hllc
 
 preserve_positivity = -1
-
-knapsack_shock_capturing = -1
 
 knapsack = QuadraticKnapsackMinimizer{Float64}

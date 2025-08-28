@@ -35,6 +35,4 @@ low_order_volume_flux = flux_hllc
 
 preserve_positivity = -1
 
-knapsack_shock_capturing = -1
-
 knapsack = QuadraticKnapsackMinimizer{Float64}
